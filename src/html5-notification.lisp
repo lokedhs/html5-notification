@@ -110,10 +110,10 @@
                            :filter (or filter (constantly t)))
             entries))))
 
-(defun wait-for-updates (subscription &key before-wait-callback (max-wait-time *maximum-notification-wait-seconds*))
+(defun wait-for-updates (subscription before-wait-callback)
   "Wait until any of the sources in SUBSCRIPTION has been updated and return the updates.
-If no updates has happened until max-wait-time seconds has elapsed,
-return NIL."
+If no updates has happened until *MAXIMUM-NOTIFICATION-WAIT-SECONDS* seconds
+has elapsed, return NIL."
   (check-type subscription subscription)
   (flet ((push-update (e)
            (with-slots (source last-id json-translate-function filter) e
@@ -149,7 +149,7 @@ return NIL."
                              e
                              #'(lambda () (push-update e))))
              (with-locked-instance (subscription)
-               (let ((timeout (+ (get-universal-time) max-wait-time)))
+               (let ((timeout (+ (get-universal-time) *maximum-notification-wait-seconds*)))
                  (loop
                     for remaining = (- timeout (get-universal-time))
                     while (and (null queue)
