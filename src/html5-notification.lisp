@@ -79,7 +79,7 @@
                             :initform (error "source must be specified")
                             :initarg :source
                             :reader subscription-entry-source)
-   (last-id                 :type (or alexandria:non-negative-integer null)
+   (last-id                 :type t
                             :initform (error "~s required when creating ~s" :last-id 'subscription-entry)
                             :initarg :last-id
                             :accessor subscription-entry-last-id)
@@ -199,7 +199,8 @@ has elapsed, return NIL."
 
 (defun http-event-value (key list)
   (let ((v (find (string key) list :key #'car :test #'equal)))
-    (if v (parse-integer (cdr v)) nil)))
+    (when v
+      (cdr v))))
 
 (defun notification-updater (sources &key before-wait-callback)
   "Main loop that wait for updates from the given sources and sends the updated
