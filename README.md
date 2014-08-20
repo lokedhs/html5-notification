@@ -1,4 +1,4 @@
 html5-notification
 ==================
 
-Common Lisp library for handling EvenSource HTML5 notifications
+Common Lisp library for handling EventSource HTML5 notifications
