@@ -110,7 +110,7 @@
                            :filter (or filter (constantly t)))
             entries))))
 
-(defun wait-for-updates (subscription before-wait-callback &key (max-wait-time *maximum-notification-wait-seconds*))
+(defun wait-for-updates (subscription &key before-wait-callback (max-wait-time *maximum-notification-wait-seconds*))
   "Wait until any of the sources in SUBSCRIPTION has been updated and return the updates.
 If no updates has happened until max-wait-time seconds has elapsed,
 return NIL."
