@@ -110,10 +110,10 @@
                            :filter (or filter (constantly t)))
             entries))))
 
-(defun wait-for-updates (subscription before-wait-callback)
+(defun wait-for-updates (subscription before-wait-callback &key (max-wait-time *maximum-notification-wait-seconds*))
   "Wait until any of the sources in SUBSCRIPTION has been updated and return the updates.
-If no updates has happened until *MAXIMUM-NOTIFICATION-WAIT-SECONDS* seconds
-has elapsed, return NIL."
+If no updates has happened until max-wait-time seconds has elapsed,
+return NIL."
   (check-type subscription subscription)
   (flet ((push-update (e)
            (with-slots (source last-id json-translate-function filter) e
@@ -128,8 +128,8 @@ has elapsed, return NIL."
                ;; }
                (flet ((make-element (res)
                         (when (funcall filter res)
-                          `((:type . ,(source-name source))
-                            (:element . ,(funcall json-translate-function res))))))
+                          (st-json:jso "type" (source-name source)
+                                       "element" (funcall json-translate-function res)))))
                  (let ((prefixed (etypecase result
                                    (list (loop for e in result for v = (make-element e) when v collect v ))
                                    (array (loop for e across result for v = (make-element e) when v collect v )))))
@@ -149,7 +149,7 @@ has elapsed, return NIL."
                              e
                              #'(lambda () (push-update e))))
              (with-locked-instance (subscription)
-               (let ((timeout (+ (get-universal-time) *maximum-notification-wait-seconds*)))
+               (let ((timeout (+ (get-universal-time) max-wait-time)))
                  (loop
                     for remaining = (- timeout (get-universal-time))
                     while (and (null queue)
@@ -247,7 +247,7 @@ that are not needed while the thread is waiting."
                     (progn
                       (format out "id:~a~a" (id-string-from-sub sub) +CRLF+)
                       (format out "data:")
-                      (json:encode-json result out)
+                      (st-json:write-json result out)
                       (format out "~a~a" +CRLF+ +CRLF+)))
                 (finish-output out))
            while (not dont-loop))))))
