@@ -11,10 +11,10 @@
   :depends-on (:bordeaux-threads
                :hunchentoot
                :split-sequence
-               :cl-json
+               :st-json
                :flexi-streams
                :alexandria)
-  :components ((:module :html5-notification
+  :components ((:module :src
                         :serial t
                         :components ((:file "notification-package")
                                      (:file "html5-notification")
