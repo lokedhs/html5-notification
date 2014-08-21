@@ -10,7 +10,8 @@
            #:simple-source
            #:simple-named-source
            #:simple-source-initial-updated-objects
-           #:named-source-mixin))
+           #:named-source-mixin
+           #:*id-part-separator*))
 
 (in-package :html5-notification)
 

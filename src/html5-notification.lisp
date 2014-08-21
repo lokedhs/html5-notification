@@ -9,6 +9,8 @@
 
 (defvar *out* (make-broadcast-stream))
 
+(defvar *id-part-separator* #\:)
+
 ;;;
 ;;;  LOCKABLE-INSTANCE-MIXIN
 ;;;
@@ -183,8 +185,9 @@ has elapsed, return NIL."
 (defun id-string-from-sub (sub)
   (format nil "~{~a~^:~}"
           (mapcar #'(lambda (entry)
-                      (format nil "~a:~a"
+                      (format nil "~a~a~a"
                               (source-name (subscription-entry-source entry))
+                              *id-part-separator*
                               (subscription-entry-last-id entry)))
                   (subscription-entries sub))))
 
@@ -195,7 +198,7 @@ has elapsed, return NIL."
                  (unless (endp list)
                    (cons (cons (car list) (cadr list))
                          (split-part (cddr list))))))
-        (split-part (split-sequence:split-sequence #\: header))))))
+        (split-part (split-sequence:split-sequence *id-part-separator* header))))))
 
 (defun http-event-value (key list)
   (let ((v (find (string key) list :key #'car :test #'equal)))
