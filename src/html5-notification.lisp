@@ -103,14 +103,14 @@
             :accessor subscription-queue)))
 
 (defun add-source (subscription source &key last-id translation-function filter)
-  (with-locked-instance (subscription)
-    (with-slots (entries) subscription
-      (push (make-instance 'subscription-entry
+  (let ((entry (make-instance 'subscription-entry
                            :source source
                            :last-id last-id
                            :json-translate-function (or translation-function #'identity)
-                           :filter (or filter (constantly t)))
-            entries))))
+                           :filter (or filter (constantly t)))))
+    (with-locked-instance (subscription)
+      (with-slots (entries) subscription
+        (push entry entries)))))
 
 (defun wait-for-updates (subscription before-wait-callback)
   "Wait until any of the sources in SUBSCRIPTION has been updated and return the updates.
