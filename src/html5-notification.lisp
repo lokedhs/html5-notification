@@ -202,9 +202,8 @@ has elapsed, return NIL."
 (defun id-string-from-sub (sub)
   (format nil "~{~a~^:~}"
           (mapcar #'(lambda (entry)
-                      (format nil "~a~a~a"
+                      (format nil "~a:~a"
                               (encode-id-part (source-name (subscription-entry-source entry)))
-                              #\:
                               (encode-id-part (subscription-entry-last-id entry))))
                   (subscription-entries sub))))
 
