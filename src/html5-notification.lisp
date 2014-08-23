@@ -9,8 +9,6 @@
 
 (defvar *out* (make-broadcast-stream))
 
-(defvar *id-part-separator* #\:)
-
 ;;;
 ;;;  LOCKABLE-INSTANCE-MIXIN
 ;;;
@@ -182,13 +180,32 @@ has elapsed, return NIL."
         (dolist (e entries)
           (remove-listener (subscription-entry-source e) e))))))
 
+(defun encode-id-part (string)
+  (with-output-to-string (s)
+    (loop
+       for ch across string
+       if (or (eq ch #\:) (eq ch #\\))
+       do (princ #\\ s)
+       do (princ ch s))))
+
+(defun decode-id-part (string)
+  (with-output-to-string (s)
+    (loop
+       with escaped = nil
+       for ch across string
+       if escaped
+       do (progn (setq escaped nil) (princ ch s))
+       else do (if (eq ch #\\)
+                   (setq escaped t)
+                   (princ ch s)))))
+
 (defun id-string-from-sub (sub)
   (format nil "~{~a~^:~}"
           (mapcar #'(lambda (entry)
                       (format nil "~a~a~a"
-                              (source-name (subscription-entry-source entry))
-                              *id-part-separator*
-                              (subscription-entry-last-id entry)))
+                              (encode-id-part (source-name (subscription-entry-source entry)))
+                              #\:
+                              (encode-id-part (subscription-entry-last-id entry))))
                   (subscription-entries sub))))
 
 (defun parse-http-event ()
@@ -198,12 +215,12 @@ has elapsed, return NIL."
                  (unless (endp list)
                    (cons (cons (car list) (cadr list))
                          (split-part (cddr list))))))
-        (split-part (split-sequence:split-sequence *id-part-separator* header))))))
+        (split-part (split-sequence:split-sequence #\: header))))))
 
 (defun http-event-value (key list)
-  (let ((v (find (string key) list :key #'car :test #'equal)))
+  (let ((v (find (encode-id-part (string key)) list :key #'car :test #'equal)))
     (when v
-      (cdr v))))
+      (decode-id-part (cdr v)))))
 
 (defun notification-updater (sources &key before-wait-callback)
   "Main loop that wait for updates from the given sources and sends the updated
