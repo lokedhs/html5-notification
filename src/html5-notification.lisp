@@ -174,7 +174,6 @@ has elapsed, return NIL."
                          (sb-thread:condition-wait (lockable-instance-cond-variable subscription)
                                                    (lockable-instance-lock subscription)
                                                    :timeout remaining))
-                    do (format corporate-chat::*out* "After wait. Result = ~s, remaining = ~s~%" queue remaining)
                     finally (return (let ((result queue))
                                       (setf queue nil)
                                       result))))))
