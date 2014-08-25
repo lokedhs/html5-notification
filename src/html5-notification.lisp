@@ -144,10 +144,11 @@ has elapsed, return NIL."
       (unwind-protect
            (progn
              (dolist (e entries)
-               (add-listener (subscription-entry-source e)
-                             (subscription-entry-last-id e)
-                             e
-                             #'(lambda () (push-update e))))
+               (let ((entry e))         ; Ensure a new binding
+                 (add-listener (subscription-entry-source entry)
+                               (subscription-entry-last-id entry)
+                               entry
+                               #'(lambda () (push-update entry)))))
              (with-locked-instance (subscription)
                (let ((timeout (+ (get-universal-time) *maximum-notification-wait-seconds*)))
                  (loop
@@ -173,6 +174,7 @@ has elapsed, return NIL."
                          (sb-thread:condition-wait (lockable-instance-cond-variable subscription)
                                                    (lockable-instance-lock subscription)
                                                    :timeout remaining))
+                    do (format corporate-chat::*out* "After wait. Result = ~s, remaining = ~s~%" queue remaining)
                     finally (return (let ((result queue))
                                       (setf queue nil)
                                       result))))))
