@@ -7,7 +7,8 @@
 (defvar *maximum-notification-wait-seconds* 30
   "The maximum time to wait for updates to any data source before sending a ping message to the browser")
 
-(defvar *out* (make-broadcast-stream))
+;;(defparameter *out* (make-broadcast-stream))
+(defparameter *out* *standard-output*)
 
 ;;;
 ;;;  LOCKABLE-INSTANCE-MIXIN
@@ -174,7 +175,6 @@ has elapsed, return NIL."
                          (sb-thread:condition-wait (lockable-instance-cond-variable subscription)
                                                    (lockable-instance-lock subscription)
                                                    :timeout remaining))
-                    do (format corporate-chat::*out* "After wait. Result = ~s, remaining = ~s~%" queue remaining)
                     finally (return (let ((result queue))
                                       (setf queue nil)
                                       result))))))
@@ -247,7 +247,9 @@ that are not needed while the thread is waiting."
   (handler-bind (#+sbcl
                  (sb-int:simple-stream-error #'(lambda (cond)
                                                  (declare (ignore cond))
-                                                 (hunchentoot:abort-request-handler))))
+                                                 (format *out* "Got SIMPLE-STREAM-ERROR~%")
+                                                 ;;(hunchentoot:abort-request-handler)
+                                                 )))
     (setf (hunchentoot:header-out :cache-control) "no-cache")
     (setf (hunchentoot:content-type*) "text/event-stream")
     (let ((out (flexi-streams:make-flexi-stream (hunchentoot:send-headers)
