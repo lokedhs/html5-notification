@@ -52,7 +52,7 @@
   (with-locked-instance (source)
     (setf (gethash reference (source-listeners source)) callback)
     (when (or (null from-id)
-              (not (eql from-id (find-current-id source))))
+              (not (equal from-id (find-current-id source))))
       (funcall callback))))
 
 (defun remove-listener (source reference)
@@ -103,15 +103,15 @@
 
 (defun add-source (subscription source &key last-id translation-function filter)
   (let ((entry (make-instance 'subscription-entry
-                           :source source
-                           :last-id last-id
-                           :json-translate-function (or translation-function #'identity)
-                           :filter (or filter (constantly t)))))
+                              :source source
+                              :last-id last-id
+                              :json-translate-function (or translation-function #'identity)
+                              :filter (or filter (constantly t)))))
     (with-locked-instance (subscription)
       (with-slots (entries) subscription
         (push entry entries)))))
 
-(defun wait-for-updates (subscription before-wait-callback)
+(defun wait-for-updates (subscription before-wait-callback expire)
   "Wait until any of the sources in SUBSCRIPTION has been updated and return the updates.
 If no updates has happened until *MAXIMUM-NOTIFICATION-WAIT-SECONDS* seconds
 has elapsed, return NIL."
@@ -151,7 +151,9 @@ has elapsed, return NIL."
                                entry
                                #'(lambda () (push-update entry)))))
              (with-locked-instance (subscription)
-               (let ((timeout (+ (get-universal-time) *maximum-notification-wait-seconds*)))
+               (let* ((now (get-universal-time))
+                      (timeout (min (+ now *maximum-notification-wait-seconds*)
+                                    expire)))
                  (loop
                     for remaining = (- timeout (get-universal-time))
                     while (and (null queue)
@@ -223,7 +225,7 @@ has elapsed, return NIL."
     (when v
       (decode-id-part (cdr v)))))
 
-(defun notification-updater (sources &key before-wait-callback)
+(defun notification-updater (sources &key before-wait-callback (max-connection 600))
   "Main loop that wait for updates from the given sources and sends the updated
 results back to the client.
 
@@ -243,7 +245,12 @@ PRINTER is #'INDENTITY.
 If the BEFORE-WAIT-CALLBACK keyword argument is non-NIL it is assumed
 to be a function which will be called just before the thread is blocking
 while waiting for updated. This callback can be used to release resources
-that are not needed while the thread is waiting."
+that are not needed while the thread is waiting.
+
+If MAX-CONNECTION is non-nil, it indicates the max number of seconds
+that the connection is allowed to be active. After this time, the
+connection will be closed."
+  (check-type max-connection (integer 0))
   (handler-bind (#+sbcl
                  (sb-int:simple-stream-error #'(lambda (cond)
                                                  (declare (ignore cond))
@@ -252,26 +259,29 @@ that are not needed while the thread is waiting."
                                                  )))
     (setf (hunchentoot:header-out :cache-control) "no-cache")
     (setf (hunchentoot:content-type*) "text/event-stream")
-    (let ((out (flexi-streams:make-flexi-stream (hunchentoot:send-headers)
-                                                :external-format :utf8))
-          (dont-loop (equal (hunchentoot:get-parameter "no_loops") "1")))
-      (let* ((http-event (parse-http-event))
-             (sub (make-instance 'subscription)))
-        (dolist (source-descriptor sources)
-          (destructuring-bind (source &key filter translation-function) source-descriptor
-            (add-source sub source
-                        :last-id (http-event-value (source-name source) http-event)
-                        :translation-function translation-function
-                        :filter filter)))
-        (loop
-           do (let ((result (wait-for-updates sub before-wait-callback)))
-                (if (null result)
-                    (format out ":none~a~a" +CRLF+ +CRLF+)
-                    ;; else
-                    (progn
-                      (format out "id:~a~a" (id-string-from-sub sub) +CRLF+)
-                      (format out "data:")
-                      (st-json:write-json result out)
-                      (format out "~a~a" +CRLF+ +CRLF+)))
-                (finish-output out))
-           while (not dont-loop))))))
+    (let* ((out (flexi-streams:make-flexi-stream (hunchentoot:send-headers)
+                                                 :external-format :utf8))
+           (dont-loop (equal (hunchentoot:get-parameter "no_loops") "1"))
+           (http-event (parse-http-event))
+           (sub (make-instance 'subscription))
+           (expire (+ (get-universal-time) max-connection)))
+      (dolist (source-descriptor sources)
+        (destructuring-bind (source &key filter translation-function) source-descriptor
+          (add-source sub source
+                      :last-id (http-event-value (source-name source) http-event)
+                      :translation-function translation-function
+                      :filter filter)))
+      (loop
+         do (let ((result (wait-for-updates sub before-wait-callback expire)))
+              ;(format *out* "wait-for-updates result: ~s~%" result)
+              (if (null result)
+                  (format out ":none~a~a" +CRLF+ +CRLF+)
+                  ;; else
+                  (progn
+                    (format out "id:~a~a" (id-string-from-sub sub) +CRLF+)
+                    (format out "data:")
+                    (st-json:write-json result out)
+                    (format out "~a~a" +CRLF+ +CRLF+)))
+              (finish-output out))
+         while (and (not dont-loop)
+                    (< (get-universal-time) expire))))))
