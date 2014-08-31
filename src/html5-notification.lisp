@@ -225,7 +225,7 @@ has elapsed, return NIL."
     (when v
       (decode-id-part (cdr v)))))
 
-(defun notification-updater (sources &key before-wait-callback (max-connection 600))
+(defun notification-updater (sources &key before-wait-callback after-write-callback (max-connection 600))
   "Main loop that wait for updates from the given sources and sends the updated
 results back to the client.
 
@@ -281,6 +281,8 @@ connection will be closed."
                     (format out "data:")
                     (st-json:write-json result out)
                     (format out "~a~a" +CRLF+ +CRLF+)))
-              (finish-output out))
+              (finish-output out)
+              (when after-write-callback
+                (funcall after-write-callback)))
          while (and (not dont-loop)
                     (< (get-universal-time) expire))))))
