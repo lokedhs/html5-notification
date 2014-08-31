@@ -273,7 +273,6 @@ connection will be closed."
                       :filter filter)))
       (loop
          do (let ((result (wait-for-updates sub before-wait-callback expire)))
-              ;(format *out* "wait-for-updates result: ~s~%" result)
               (if (null result)
                   (format out ":none~a~a" +CRLF+ +CRLF+)
                   ;; else
