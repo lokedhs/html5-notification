@@ -15,7 +15,8 @@
            #:subscription
            #:add-listener
            #:remove-listener
-           #:updated-objects-from-entry))
+           #:updated-objects-from-entry 
+           #:subscription-entry-last-id))
 
 (in-package :html5-notification)
 
