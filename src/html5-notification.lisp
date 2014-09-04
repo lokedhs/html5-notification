@@ -293,12 +293,7 @@ connection will be closed."
          do (let ((result (wait-for-updates sub before-wait-callback expire)))
               (if (null result)
                   (format out ":none~a~a" +CRLF+ +CRLF+)
-                  ;; else
-                  (progn
-                    (format out "id:~a~a" (id-string-from-sub sub) +CRLF+)
-                    (format out "data:")
-                    (st-json:write-json result out)
-                    (format out "~a~a" +CRLF+ +CRLF+)))
+                  (princ (format-update-message-text sub result) out))
               (finish-output out)
               (when after-write-callback
                 (funcall after-write-callback)))
