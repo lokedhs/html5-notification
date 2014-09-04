@@ -48,17 +48,20 @@
 (defgeneric source-name (source)
   (:documentation "Returns the name of the source. Used as a key in the JSON output."))
 
-(defun add-listener (source from-id reference callback)
-  (with-locked-instance (source)
-    (setf (gethash reference (source-listeners source)) callback)
-    (when (or (null from-id)
-              (not (equal from-id (find-current-id source))))
-      (funcall callback))))
+(defun add-listener (reference callback)
+  (let ((source (subscription-entry-source reference))
+        (from-id (subscription-entry-last-id reference)))
+    (with-locked-instance (source)
+      (setf (gethash reference (source-listeners source)) callback)
+      (when (or (null from-id)
+                (not (equal from-id (find-current-id source))))
+        (funcall callback)))))
 
-(defun remove-listener (source reference)
-  (with-locked-instance (source)
-    (unless (remhash reference (source-listeners source))
-      (format *debug-io* "Trying to remove nonexistent listener. source = ~s reference = ~s" source reference))))
+(defun remove-listener (reference)
+  (let ((source (subscription-entry-source reference)))
+    (with-locked-instance (source)
+      (unless (remhash reference (source-listeners source))
+        (format *debug-io* "Trying to remove nonexistent listener. source = ~s reference = ~s" source reference)))))
 
 (defgeneric notify (source)
   (:documentation "Notify the listeners that SOURCE has been updated."))
@@ -157,10 +160,7 @@ has elapsed, return NIL."
            (progn
              (dolist (e entries)
                (let ((entry e))         ; Ensure a new binding
-                 (add-listener (subscription-entry-source entry)
-                               (subscription-entry-last-id entry)
-                               entry
-                               #'(lambda () (push-update entry)))))
+                 (add-listener entry #'(lambda () (push-update entry)))))
              (with-locked-instance (subscription)
                (let* ((now (get-universal-time))
                       (timeout (min (+ now *maximum-notification-wait-seconds*)
@@ -193,7 +193,7 @@ has elapsed, return NIL."
                                       result))))))
         ;; Unwind form: Make sure that all listeners are removed before exiting scope
         (dolist (e entries)
-          (remove-listener (subscription-entry-source e) e))))))
+          (remove-listener e))))))
 
 (defun encode-id-part (string)
   (with-output-to-string (s)

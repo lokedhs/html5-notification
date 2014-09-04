@@ -13,7 +13,8 @@
            #:named-source-mixin
            #:*id-part-separator*
            #:subscription
-           ))
+           #:add-listener
+           #:remove-listener))
 
 (in-package :html5-notification)
 
