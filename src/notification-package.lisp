@@ -14,7 +14,8 @@
            #:*id-part-separator*
            #:subscription
            #:add-listener
-           #:remove-listener))
+           #:remove-listener
+           #:updated-objects-from-entry))
 
 (in-package :html5-notification)
 

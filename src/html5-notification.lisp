@@ -125,35 +125,41 @@
       (with-slots (entries) subscription
         (push entry entries)))))
 
+(defun updated-objects-from-entry (entry)
+  (check-type entry subscription-entry)
+  (with-slots (source last-id json-translate-function filter) entry
+    (destructuring-bind (result new-id)
+        (with-locked-instance (source)
+          (list (find-updated-objects source last-id)
+                (find-current-id source)))
+      ;; Make each updated object into the following format:
+      ;; {
+      ;;   type: "type-name",
+      ;;   element: { ... }
+      ;; }
+      (flet ((make-element (res)
+               (when (funcall filter res)
+                 (st-json:jso "type" (source-name source)
+                              "element" (funcall json-translate-function res)))))
+        (let ((prefixed (etypecase result
+                          (list (loop for e in result for v = (make-element e) when v collect v ))
+                          (array (loop for e across result for v = (make-element e) when v collect v )))))
+          ;; Append the updated objects to the queue
+          (values prefixed new-id))))))
+
 (defun wait-for-updates (subscription before-wait-callback expire)
   "Wait until any of the sources in SUBSCRIPTION has been updated and return the updates.
 If no updates has happened until *MAXIMUM-NOTIFICATION-WAIT-SECONDS* seconds
 has elapsed, return NIL."
   (check-type subscription subscription)
   (flet ((push-update (e)
-           (with-slots (source last-id json-translate-function filter) e
-             (destructuring-bind (result new-id)
-                 (with-locked-instance (source)
-                   (list (find-updated-objects source last-id)
-                         (find-current-id source)))
-               ;; Make each updated object into the following format:
-               ;; {
-               ;;   type: "type-name",
-               ;;   element: { ... }
-               ;; }
-               (flet ((make-element (res)
-                        (when (funcall filter res)
-                          (st-json:jso "type" (source-name source)
-                                       "element" (funcall json-translate-function res)))))
-                 (let ((prefixed (etypecase result
-                                   (list (loop for e in result for v = (make-element e) when v collect v ))
-                                   (array (loop for e across result for v = (make-element e) when v collect v )))))
-                   ;; Append the updated objects to the queue
-                   (with-locked-instance (subscription)
-                     (setf last-id new-id)
-                     (when prefixed
-                       (setf (subscription-queue subscription) (append (subscription-queue subscription) prefixed))
-                       (bordeaux-threads:condition-notify (lockable-instance-cond-variable subscription))))))))))
+           (with-slots (last-id) e
+             (multiple-value-bind (prefixed new-id) (updated-objects-from-entry e)
+               (with-locked-instance (subscription)
+                 (setf last-id new-id)
+                 (when prefixed
+                   (setf (subscription-queue subscription) (append (subscription-queue subscription) prefixed))
+                   (bordeaux-threads:condition-notify (lockable-instance-cond-variable subscription))))))))
 
     (with-slots (entries queue) subscription
       (unwind-protect
