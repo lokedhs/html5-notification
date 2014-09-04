@@ -241,6 +241,13 @@ has elapsed, return NIL."
     (when v
       (decode-id-part (cdr v)))))
 
+(defun format-update-message-text (subscription prefixed)
+  (with-output-to-string (out)
+    (format out "id:~a~a" (html5-notification:id-string-from-sub subscription) +CRLF+)
+    (format out "data:")
+    (st-json:write-json prefixed out)
+    (format out "~a~a" +CRLF+ +CRLF+)))
+
 (defun notification-updater (sources &key before-wait-callback after-write-callback (max-connection 600))
   "Main loop that wait for updates from the given sources and sends the updated
 results back to the client.
