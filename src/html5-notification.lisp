@@ -101,7 +101,18 @@
             :initform nil
             :accessor subscription-queue)))
 
+(defmethod initialize-instance :after ((obj subscription) &key sources http-event &allow-other-keys)
+  (let ((parsed (parse-http-event http-event)))
+    (dolist (source-descriptor sources)
+      (destructuring-bind (source &key filter translation-function) source-descriptor
+        (add-source obj source
+                    :last-id (http-event-value (source-name source) parsed)
+                    :translation-function translation-function
+                    :filter filter)))))
+
 (defun add-source (subscription source &key last-id translation-function filter)
+  (check-type subscription subscription)
+  (check-type source source)
   (let ((entry (make-instance 'subscription-entry
                               :source source
                               :last-id last-id
@@ -211,14 +222,13 @@ has elapsed, return NIL."
                               (encode-id-part (subscription-entry-last-id entry))))
                   (subscription-entries sub))))
 
-(defun parse-http-event ()
-  (let ((header (hunchentoot:header-in* :last-event-id)))
-    (when header
-      (labels ((split-part (list)
-                 (unless (endp list)
-                   (cons (cons (car list) (cadr list))
-                         (split-part (cddr list))))))
-        (split-part (split-sequence:split-sequence #\: header))))))
+(defun parse-http-event (header)
+  (when header
+    (labels ((split-part (list)
+               (unless (endp list)
+                 (cons (cons (car list) (cadr list))
+                       (split-part (cddr list))))))
+      (split-part (split-sequence:split-sequence #\: header)))))
 
 (defun http-event-value (key list)
   (let ((v (find (encode-id-part (string key)) list :key #'car :test #'equal)))
@@ -262,15 +272,8 @@ connection will be closed."
     (let* ((out (flexi-streams:make-flexi-stream (hunchentoot:send-headers)
                                                  :external-format :utf8))
            (dont-loop (equal (hunchentoot:get-parameter "no_loops") "1"))
-           (http-event (parse-http-event))
-           (sub (make-instance 'subscription))
+           (sub (make-instance 'subscription :http-event (hunchentoot:header-in* :last-event-id) :sources sources))
            (expire (+ (get-universal-time) max-connection)))
-      (dolist (source-descriptor sources)
-        (destructuring-bind (source &key filter translation-function) source-descriptor
-          (add-source sub source
-                      :last-id (http-event-value (source-name source) http-event)
-                      :translation-function translation-function
-                      :filter filter)))
       (loop
          do (let ((result (wait-for-updates sub before-wait-callback expire)))
               (if (null result)

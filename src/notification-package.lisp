@@ -11,7 +11,9 @@
            #:simple-named-source
            #:simple-source-initial-updated-objects
            #:named-source-mixin
-           #:*id-part-separator*))
+           #:*id-part-separator*
+           #:subscription
+           ))
 
 (in-package :html5-notification)
 
