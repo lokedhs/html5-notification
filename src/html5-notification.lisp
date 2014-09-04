@@ -222,11 +222,13 @@ has elapsed, return NIL."
 
 (defun id-string-from-sub (sub)
   (format nil "~{~a~^:~}"
-          (mapcar #'(lambda (entry)
-                      (format nil "~a:~a"
-                              (encode-id-part (source-name (subscription-entry-source entry)))
-                              (encode-id-part (subscription-entry-last-id entry))))
-                  (subscription-entries sub))))
+          (loop
+             for entry in (subscription-entries sub)
+             for id = (subscription-entry-last-id entry)
+             when id
+             collect (format nil "~a:~a"
+                             (encode-id-part (source-name (subscription-entry-source entry)))
+                             (encode-id-part id)))))
 
 (defun parse-http-event (header)
   (when header
@@ -243,7 +245,7 @@ has elapsed, return NIL."
 
 (defun format-update-message-text (subscription prefixed)
   (with-output-to-string (out)
-    (format out "id:~a~a" (html5-notification:id-string-from-sub subscription) +CRLF+)
+    (format out "id:~a~a" (id-string-from-sub subscription) +CRLF+)
     (format out "data:")
     (st-json:write-json prefixed out)
     (format out "~a~a" +CRLF+ +CRLF+)))
