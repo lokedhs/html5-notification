@@ -19,7 +19,8 @@
            #:subscription-entry-last-id
            #:id-string-from-sub
            #:format-update-message-text
-           #:send-ping-message))
+           #:send-ping-message
+           #:with-locked-instance))
 
 (in-package :html5-notification)
 
