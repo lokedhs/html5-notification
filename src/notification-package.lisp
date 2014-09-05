@@ -18,7 +18,8 @@
            #:updated-objects-from-entry 
            #:subscription-entry-last-id
            #:id-string-from-sub
-           #:format-update-message-text))
+           #:format-update-message-text
+           #:send-ping-message))
 
 (in-package :html5-notification)
 

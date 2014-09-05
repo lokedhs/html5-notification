@@ -250,6 +250,9 @@ has elapsed, return NIL."
     (st-json:write-json prefixed out)
     (format out "~a~a" +CRLF+ +CRLF+)))
 
+(defun send-ping-message (out)
+  (format out ":none~a~a" +CRLF+ +CRLF+))
+
 (defun notification-updater (sources &key before-wait-callback after-write-callback (max-connection 600))
   "Main loop that wait for updates from the given sources and sends the updated
 results back to the client.
@@ -292,7 +295,7 @@ connection will be closed."
       (loop
          do (let ((result (wait-for-updates sub before-wait-callback expire)))
               (if (null result)
-                  (format out ":none~a~a" +CRLF+ +CRLF+)
+                  (send-ping-message out)
                   (princ (format-update-message-text sub result) out))
               (finish-output out)
               (when after-write-callback
