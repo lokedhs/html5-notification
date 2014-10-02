@@ -20,4 +20,5 @@
                                      (:file "html5-notification")
                                      (:file "named-source")
                                      (:file "simple-source")
+                                     (:file "indexed-source")
                                      (:file "html5-notification-tests")))))

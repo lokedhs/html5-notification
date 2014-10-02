@@ -20,7 +20,9 @@
            #:id-string-from-sub
            #:format-update-message-text
            #:send-ping-message
-           #:with-locked-instance))
+           #:with-locked-instance
+           #:indexed-source
+           #:indexed-source-notify))
 
 (in-package :html5-notification)
 

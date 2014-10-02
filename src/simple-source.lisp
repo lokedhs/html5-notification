@@ -25,7 +25,9 @@ elements: id, date and object.")
   ()
   (:documentation "A version of SIMPLE-SOURCE that has a name field."))
 
-(defun simple-notify (source object)
+(defgeneric simple-notify (source object))
+
+(defmethod simple-notify ((source simple-source) object)
   (with-locked-instance (source)
     (with-slots (queue max-history current-id) source
       ;; Clear expired entries
