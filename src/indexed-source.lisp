@@ -32,6 +32,6 @@
         nil
         (indexed-source-state source))))
 
-(defclass named-indexed-source (indexed-source named-source-mixin)
+(defclass indexed-source-named (indexed-source named-source-mixin)
   ()
   (:documentation "A version of INDEXED-SOURCE that has a name field."))
