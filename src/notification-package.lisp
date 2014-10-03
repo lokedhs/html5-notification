@@ -22,7 +22,8 @@
            #:send-ping-message
            #:with-locked-instance
            #:indexed-source
-           #:indexed-source-notify))
+           #:indexed-source-notify
+           #:indexed-source-named))
 
 (in-package :html5-notification)
 
