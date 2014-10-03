@@ -28,7 +28,7 @@
 
 (defmethod find-updated-objects ((source indexed-source) from-id)
   (with-locked-instance (source)
-    (if (= from-id (indexed-source-index source))
+    (if (= (parse-integer from-id) (indexed-source-index source))
         nil
         (indexed-source-state source))))
 
