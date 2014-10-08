@@ -13,7 +13,8 @@
                :split-sequence
                :st-json
                :flexi-streams
-               :alexandria)
+               :alexandria
+               :log4cl)
   :components ((:module :src
                         :serial t
                         :components ((:file "notification-package")

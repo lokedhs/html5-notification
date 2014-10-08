@@ -7,9 +7,6 @@
 (defvar *maximum-notification-wait-seconds* 30
   "The maximum time to wait for updates to any data source before sending a ping message to the browser")
 
-;;(defparameter *out* (make-broadcast-stream))
-(defparameter *out* *standard-output*)
-
 ;;;
 ;;;  LOCKABLE-INSTANCE-MIXIN
 ;;;
@@ -61,7 +58,7 @@
   (let ((source (subscription-entry-source reference)))
     (with-locked-instance (source)
       (unless (remhash reference (source-listeners source))
-        (format *debug-io* "Trying to remove nonexistent listener. source = ~s reference = ~s" source reference)))))
+        (log:error "Trying to remove nonexistent listener. source = ~s reference = ~s" source reference)))))
 
 (defgeneric notify (source)
   (:documentation "Notify the listeners that SOURCE has been updated."))
@@ -282,7 +279,7 @@ connection will be closed."
   (handler-bind (#+sbcl
                  (sb-int:simple-stream-error #'(lambda (cond)
                                                  (declare (ignore cond))
-                                                 (format *out* "Got SIMPLE-STREAM-ERROR~%")
+                                                 (log:warn "Got SIMPLE-STREAM-ERROR~%")
                                                  ;;(hunchentoot:abort-request-handler)
                                                  )))
     (setf (hunchentoot:header-out :cache-control) "no-cache")
