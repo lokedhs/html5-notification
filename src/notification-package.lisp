@@ -23,7 +23,8 @@
            #:with-locked-instance
            #:indexed-source
            #:indexed-source-notify
-           #:indexed-source-named))
+           #:indexed-source-named
+           #:get-single-update))
 
 (in-package :html5-notification)
 

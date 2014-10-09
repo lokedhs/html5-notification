@@ -311,3 +311,9 @@ connection will be closed."
                 (funcall after-write-callback)))
          while (and (not dont-loop)
                     (< (get-universal-time) expire))))))
+
+(defun get-single-update (event-id sources &key (max-connection 600))
+  (check-type max-connection (integer 0))
+  (let ((sub (make-instance 'subscription :http-event event-id :sources sources)))
+    (let ((result (wait-for-updates sub nil (+ (get-universal-time) max-connection))))
+      (list (id-string-from-sub sub) result))))
