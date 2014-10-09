@@ -101,7 +101,7 @@
             :initform nil
             :accessor subscription-queue)))
 
-(defmethod initialize-instance :after ((obj subscription) &key sources http-event &allow-other-keys)
+(defmethod initialize-instance :after ((obj subscription) &key sources http-event)
   (let ((parsed (parse-http-event http-event)))
     (dolist (source-descriptor sources)
       (destructuring-bind (source &key filter translation-function) source-descriptor
@@ -198,24 +198,38 @@ has elapsed, return NIL."
         (dolist (e entries)
           (remove-listener e))))))
 
-(defun encode-id-part (string)
+(defun encode-name (string)
+  (check-type string string)
   (with-output-to-string (s)
     (loop
        for ch across string
-       if (or (eq ch #\:) (eq ch #\\))
-       do (princ #\\ s)
-       do (princ ch s))))
+       for code = (char-code ch)
+       if (or (<= (char-code #\a) code (char-code #\z))
+              (<= (char-code #\A) code (char-code #\Z))
+              (<= (char-code #\0) code (char-code #\9))
+              (eql ch #\@)
+              (eql ch #\_)
+              (eql ch #\.)
+              (eql ch #\,)
+              (> code 255))
+       do (princ ch s)
+       else
+       do (format s "!~2,'0x" code))))
 
-(defun decode-id-part (string)
+(defun decode-name (string)
+  (check-type string string)
   (with-output-to-string (s)
     (loop
-       with escaped = nil
-       for ch across string
-       if escaped
-       do (progn (setq escaped nil) (princ ch s))
-       else do (if (eq ch #\\)
-                   (setq escaped t)
-                   (princ ch s)))))
+       with len = (length string)
+       with i = 0
+       while (< i len)
+       for ch = (aref string i)
+       do (incf i)
+       if (eq ch #\!)
+       do (progn
+            (princ (code-char (parse-integer string :start i :end (+ 2 i) :radix 16)) s)
+            (incf i 2))
+       else do (princ ch s))))
 
 (defun id-string-from-sub (sub)
   (format nil "~{~a~^:~}"
@@ -224,21 +238,19 @@ has elapsed, return NIL."
              for id = (subscription-entry-last-id entry)
              when id
              collect (format nil "~a:~a"
-                             (encode-id-part (source-name (subscription-entry-source entry)))
-                             (encode-id-part id)))))
+                             (encode-name (source-name (subscription-entry-source entry)))
+                             (encode-name id)))))
 
 (defun parse-http-event (header)
   (when header
     (labels ((split-part (list)
                (unless (endp list)
-                 (cons (cons (car list) (cadr list))
+                 (cons (cons (decode-name (car list)) (decode-name (cadr list)))
                        (split-part (cddr list))))))
       (split-part (split-sequence:split-sequence #\: header)))))
 
 (defun http-event-value (key list)
-  (let ((v (find (encode-id-part (string key)) list :key #'car :test #'equal)))
-    (when v
-      (decode-id-part (cdr v)))))
+  (cdr (find (string key) list :key #'car :test #'equal)))
 
 (defun format-update-message-text (subscription prefixed)
   (with-output-to-string (out)
