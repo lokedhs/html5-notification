@@ -39,6 +39,13 @@
 (defgeneric find-updated-objects (source from-id)
   (:documentation "Returns a list of elements with an id higher than FROM-ID."))
 
+(defgeneric find-initial-objects (source num-objects)
+  (:documentation "Return a list of NUM-OBJECTS most recent objects."))
+
+(defmethod find-initial-objects ((source t) num-objects)
+  "Default implementation that returns NIL."
+  nil)
+
 (defgeneric find-current-id (source)
   (:documentation "Returns the current id of SOURCE."))
 
@@ -90,16 +97,25 @@
                             :reader subscription-entry-translation-function)
    (filter                  :type function
                             :initarg :filter
-                            :reader subscription-entry-filter)))
+                            :reader subscription-entry-filter)
+   (num-objects             :type (integer 0)
+                            :initform 0
+                            :initarg :num-objects
+                            :reader subscription-entry-num-objects
+                            :documentation "The number of initial objects to return when no event-id was passed in")))
                        
 (defclass subscription (lockable-instance-mixin)
-  ((entries :type list
-            :initform nil
-            :accessor subscription-entries
-            :documentation "List of instances of SUBSCRIPTION-ENTRY")
-   (queue   :type list
-            :initform nil
-            :accessor subscription-queue)))
+  ((entries     :type list
+                :initform nil
+                :accessor subscription-entries
+                :documentation "List of instances of SUBSCRIPTION-ENTRY")
+   (queue       :type list
+                :initform nil
+                :accessor subscription-queue
+                :documentation "Updates are pushed to this queue with the client reading the "))
+  (:documentation "Class representing an active subscription to a set
+of sources. The instance is valid while the client is actively
+listening to updates from the source."))
 
 (defmethod initialize-instance :after ((obj subscription) &key sources http-event)
   (let ((parsed (parse-http-event http-event)))
@@ -127,7 +143,9 @@
   (with-slots (source last-id json-translate-function filter) entry
     (destructuring-bind (result new-id)
         (with-locked-instance (source)
-          (list (find-updated-objects source last-id)
+          (list (if last-id
+                    (find-updated-objects source last-id)
+                    (find-initial-objects source (subscription-entry-num-objects entry)))
                 (find-current-id source)))
       ;; Make each updated object into the following format:
       ;; {

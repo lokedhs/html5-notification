@@ -24,7 +24,8 @@
            #:indexed-source
            #:indexed-source-notify
            #:indexed-source-named
-           #:get-single-update))
+           #:get-single-update
+           #:find-initial-objects))
 
 (in-package :html5-notification)
 
