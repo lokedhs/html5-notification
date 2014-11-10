@@ -112,7 +112,7 @@
    (queue       :type list
                 :initform nil
                 :accessor subscription-queue
-                :documentation "Updates are pushed to this queue with the client reading the "))
+                :documentation "Queue which the updates are pushed to"))
   (:documentation "Class representing an active subscription to a set
 of sources. The instance is valid while the client is actively
 listening to updates from the source."))
@@ -120,20 +120,22 @@ listening to updates from the source."))
 (defmethod initialize-instance :after ((obj subscription) &key sources http-event)
   (let ((parsed (parse-http-event http-event)))
     (dolist (source-descriptor sources)
-      (destructuring-bind (source &key filter translation-function) source-descriptor
+      (destructuring-bind (source &key filter translation-function num-objects) source-descriptor
         (add-source obj source
                     :last-id (http-event-value (source-name source) parsed)
                     :translation-function translation-function
-                    :filter filter)))))
+                    :filter filter
+                    :num-objects (or num-objects 0))))))
 
-(defun add-source (subscription source &key last-id translation-function filter)
+(defun add-source (subscription source &key last-id translation-function filter num-objects)
   (check-type subscription subscription)
   (check-type source source)
   (let ((entry (make-instance 'subscription-entry
                               :source source
                               :last-id last-id
                               :json-translate-function (or translation-function #'identity)
-                              :filter (or filter (constantly t)))))
+                              :filter (or filter (constantly t))
+                              :num-objects num-objects)))
     (with-locked-instance (subscription)
       (with-slots (entries) subscription
         (push entry entries)))))
