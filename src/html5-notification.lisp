@@ -335,5 +335,7 @@ connection will be closed."
 (defun get-single-update (event-id sources &key (max-connection 600))
   (check-type max-connection (integer 0))
   (let ((sub (make-instance 'subscription :http-event event-id :sources sources)))
+    (log:trace "Waiting for updates from: ~s" sources)
     (let ((result (wait-for-updates sub nil (+ (get-universal-time) max-connection))))
+      (log:trace "Got updates: ~s" result)
       (list (id-string-from-sub sub) result))))
