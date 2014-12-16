@@ -4,7 +4,7 @@
 
 (alexandria:define-constant +CRLF+ (format nil "~c~c" #\Return #\Newline) :test 'equal)
 
-(defvar *maximum-notification-wait-seconds* 3600
+(defvar *maximum-notification-wait-seconds* 30
   "The maximum time to wait for updates to any data source before sending a ping message to the browser")
 
 ;;;
