@@ -39,10 +39,10 @@
 (defgeneric find-updated-objects (source from-id)
   (:documentation "Returns a list of elements with an id higher than FROM-ID."))
 
-(defgeneric find-initial-objects (source num-objects)
+(defgeneric find-initial-objects (source num-objects from-id)
   (:documentation "Return a list of NUM-OBJECTS most recent objects."))
 
-(defmethod find-initial-objects ((source t) num-objects)
+(defmethod find-initial-objects ((source t) num-objects from-id)
   "Default implementation that returns NIL."
   nil)
 
@@ -102,7 +102,12 @@
                             :initform 0
                             :initarg :num-objects
                             :reader subscription-entry-num-objects
-                            :documentation "The number of initial objects to return when no event-id was passed in")))
+                            :documentation "The number of initial objects to return when no event-id was passed in")
+   (from-id                 :type (or null string)
+                            :initarg :from-id
+                            :initform nil
+                            :reader subscription-entry-from-id
+                            :documentation "An identifier indicating from where to start returning results.")))
                        
 (defclass subscription (lockable-instance-mixin)
   ((entries     :type list
@@ -120,14 +125,15 @@ listening to updates from the source."))
 (defmethod initialize-instance :after ((obj subscription) &key sources http-event)
   (let ((parsed (parse-http-event http-event)))
     (dolist (source-descriptor sources)
-      (destructuring-bind (source &key filter translation-function num-objects) source-descriptor
+      (destructuring-bind (source &key filter translation-function num-objects from-id) source-descriptor
         (add-source obj source
                     :last-id (http-event-value (source-name source) parsed)
                     :translation-function translation-function
                     :filter filter
-                    :num-objects (or num-objects 0))))))
+                    :num-objects (or num-objects 0)
+                    :from-id from-id)))))
 
-(defun add-source (subscription source &key last-id translation-function filter num-objects)
+(defun add-source (subscription source &key last-id translation-function filter num-objects from-id)
   (check-type subscription subscription)
   (check-type source source)
   (let ((entry (make-instance 'subscription-entry
@@ -135,7 +141,8 @@ listening to updates from the source."))
                               :last-id last-id
                               :json-translate-function (or translation-function #'identity)
                               :filter (or filter (constantly t))
-                              :num-objects num-objects)))
+                              :num-objects num-objects
+                              :from-id from-id)))
     (with-locked-instance (subscription)
       (with-slots (entries) subscription
         (push entry entries)))))
@@ -147,7 +154,9 @@ listening to updates from the source."))
         (with-locked-instance (source)
           (list (if last-id
                     (find-updated-objects source last-id)
-                    (find-initial-objects source (subscription-entry-num-objects entry)))
+                    (find-initial-objects source
+                                          (subscription-entry-num-objects entry)
+                                          (subscription-entry-from-id entry)))
                 (find-current-id source)))
       ;; Make each updated object into the following format:
       ;; {
