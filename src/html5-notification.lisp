@@ -75,6 +75,7 @@
                     (loop
                        for element being the hash-value of (source-listeners source)
                        collect element))))
+    (log:trace "Notify start for source: ~s, num-elements: ~a" source (length elements))
     (dolist (element elements)
       (funcall element))))
 
@@ -180,8 +181,8 @@ has elapsed, return NIL."
   (check-type subscription subscription)
   (flet ((push-update (e)
            (with-slots (last-id) e
-             (multiple-value-bind (prefixed new-id) (updated-objects-from-entry e)
-               (with-locked-instance (subscription)
+             (with-locked-instance (subscription)
+               (multiple-value-bind (prefixed new-id) (updated-objects-from-entry e)
                  (setf last-id new-id)
                  (when prefixed
                    (setf (subscription-queue subscription) (append (subscription-queue subscription) prefixed))
@@ -193,36 +194,36 @@ has elapsed, return NIL."
              (dolist (e entries)
                (let ((entry e))         ; Ensure a new binding
                  (add-listener entry #'(lambda () (push-update entry)))))
-             (with-locked-instance (subscription)
-               (let* ((now (get-universal-time))
-                      (timeout (min (+ now *maximum-notification-wait-seconds*)
-                                    expire)))
-                 (loop
-                    for remaining = (- timeout (get-universal-time))
-                    while (and (null queue)
-                               (plusp remaining))
-                    do (progn
-                         (when before-wait-callback
-                           (funcall before-wait-callback))
-                         ;; The below code uses a platform-specific version of condition-wait for SBCL.
-                         ;; This is because of a bug in SBCL that prevents with-timeout to actually
-                         ;; perform a timeout under certain circumstances.
-                         ;;
-                         ;; The workaround solution is the proper one to use anyway, as with-timeout
-                         ;; is considered unsafe.
-                         #-sbcl
+             (let* ((now (get-universal-time))
+                    (timeout (min (+ now *maximum-notification-wait-seconds*)
+                                  expire)))
+               (loop
+                  for remaining = (- timeout (get-universal-time))
+                  while (plusp remaining)
+                  do (with-locked-instance (subscription)
+                       (when queue
+                         (let ((old queue))
+                           (setf queue nil)
+                           (return old)))
+                       (when before-wait-callback
+                         (funcall before-wait-callback))
+                       ;; The below code uses a platform-specific version of condition-wait for SBCL.
+                       ;; This is because of a bug in SBCL that prevents with-timeout to actually
+                       ;; perform a timeout under certain circumstances.
+                       ;;
+                       ;; The workaround solution is the proper one to use anyway, as with-timeout
+                       ;; is considered unsafe.
+                       #-sbcl
+                       (progn
                          (handler-case
                              (bordeaux-threads:with-timeout (remaining)
                                (bordeaux-threads:condition-wait (lockable-instance-cond-variable subscription)
                                                                 (lockable-instance-lock subscription)))
-                           (bordeaux-threads:timeout (v) v))
-                         #+sbcl
-                         (sb-thread:condition-wait (lockable-instance-cond-variable subscription)
-                                                   (lockable-instance-lock subscription)
-                                                   :timeout remaining))
-                    finally (return (let ((result queue))
-                                      (setf queue nil)
-                                      result))))))
+                           (bordeaux-threads:timeout (v) v)))
+                       #+sbcl
+                       (sb-thread:condition-wait (lockable-instance-cond-variable subscription)
+                                                 (lockable-instance-lock subscription)
+                                                 :timeout remaining)))))
         ;; Unwind form: Make sure that all listeners are removed before exiting scope
         (dolist (e entries)
           (remove-listener e))))))
