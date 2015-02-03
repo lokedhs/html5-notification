@@ -145,8 +145,7 @@ listening to updates from the source."))
                               :num-objects num-objects
                               :from-id from-id)))
     (with-locked-instance (subscription)
-      (with-slots (entries) subscription
-        (push entry entries)))))
+      (push entry (subscription-entries subscription)))))
 
 (defun updated-objects-from-entry (entry)
   (check-type entry subscription-entry)
@@ -188,10 +187,10 @@ has elapsed, return NIL."
                    (setf (subscription-queue subscription) (append (subscription-queue subscription) prefixed))
                    (bordeaux-threads:condition-notify (lockable-instance-cond-variable subscription))))))))
 
-    (with-slots (entries queue) subscription
+    (block updater
       (unwind-protect
            (progn
-             (dolist (e entries)
+             (dolist (e (subscription-entries subscription))
                (let ((entry e))         ; Ensure a new binding
                  (add-listener entry #'(lambda () (push-update entry)))))
              (let* ((now (get-universal-time))
@@ -201,10 +200,10 @@ has elapsed, return NIL."
                   for remaining = (- timeout (get-universal-time))
                   while (plusp remaining)
                   do (with-locked-instance (subscription)
-                       (when queue
-                         (let ((old queue))
-                           (setf queue nil)
-                           (return old)))
+                       (when (subscription-queue subscription)
+                         (let ((old (subscription-queue subscription)))
+                           (setf (subscription-queue subscription) nil)
+                           (return-from updater old)))
                        (when before-wait-callback
                          (funcall before-wait-callback))
                        ;; The below code uses a platform-specific version of condition-wait for SBCL.
@@ -225,7 +224,7 @@ has elapsed, return NIL."
                                                  (lockable-instance-lock subscription)
                                                  :timeout remaining)))))
         ;; Unwind form: Make sure that all listeners are removed before exiting scope
-        (dolist (e entries)
+        (dolist (e (subscription-entries subscription))
           (remove-listener e))))))
 
 (defun encode-name (string)
