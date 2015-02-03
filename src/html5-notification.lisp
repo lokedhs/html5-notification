@@ -179,13 +179,9 @@ If no updates has happened until *MAXIMUM-NOTIFICATION-WAIT-SECONDS* seconds
 has elapsed, return NIL."
   (check-type subscription subscription)
   (flet ((push-update (e)
-           (with-slots (last-id) e
-             (with-locked-instance (subscription)
-               (multiple-value-bind (prefixed new-id) (updated-objects-from-entry e)
-                 (setf last-id new-id)
-                 (when prefixed
-                   (setf (subscription-queue subscription) (append (subscription-queue subscription) prefixed))
-                   (bordeaux-threads:condition-notify (lockable-instance-cond-variable subscription))))))))
+           (with-locked-instance (subscription)
+             (pushnew e (subscription-queue subscription))
+             (bordeaux-threads:condition-notify (lockable-instance-cond-variable subscription)))))
 
     (block updater
       (unwind-protect
@@ -201,9 +197,7 @@ has elapsed, return NIL."
                   while (plusp remaining)
                   do (with-locked-instance (subscription)
                        (when (subscription-queue subscription)
-                         (let ((old (subscription-queue subscription)))
-                           (setf (subscription-queue subscription) nil)
-                           (return-from updater old)))
+                         (return-from updater nil))
                        (when before-wait-callback
                          (funcall before-wait-callback))
                        ;; The below code uses a platform-specific version of condition-wait for SBCL.
@@ -225,7 +219,20 @@ has elapsed, return NIL."
                                                  :timeout remaining)))))
         ;; Unwind form: Make sure that all listeners are removed before exiting scope
         (dolist (e (subscription-entries subscription))
-          (remove-listener e))))))
+          (remove-listener e))))
+    ;; At this point we may or may not have any updated entries.
+    ;; However, there may still be some updates coming in since the
+    ;; updates are asynchronous from the sender. Thus, we copy it
+    ;; while holding the lock.
+    (let ((result nil))
+      (with-locked-instance (subscription)
+        (dolist (e (subscription-queue subscription))
+          (multiple-value-bind (prefixed new-id)
+              (updated-objects-from-entry e)
+            (setf (subscription-entry-last-id e) new-id)
+            (setq result (append result prefixed))))
+        (setf (subscription-queue subscription) nil))
+      result)))
 
 (defun encode-name (string)
   (check-type string string)
